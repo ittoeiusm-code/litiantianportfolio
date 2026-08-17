@@ -25,30 +25,37 @@ const motionProjects = [
   {
     title: '友邦保险“PPR全程健康友保障”',
     src: './assets/donghua/1友邦保险“PPR全程健康友保障”.mp4',
+    poster: './assets/donghua/posters/01.webp',
   },
   {
     title: '友邦保险“友如意·星享佳”',
     src: './assets/donghua/2友邦保险“友如意·星享佳”.mp4',
+    poster: './assets/donghua/posters/02.webp',
   },
   {
     title: '5G医疗',
     src: './assets/donghua/35G医疗.mp4',
+    poster: './assets/donghua/posters/03.webp',
   },
   {
     title: '联通智慧沃家',
     src: './assets/donghua/4联通智慧沃家.mp4',
+    poster: './assets/donghua/posters/04.webp',
   },
   {
     title: '天猫鲁班之星',
     src: './assets/donghua/5天猫鲁班之星.mp4',
+    poster: './assets/donghua/posters/05.webp',
   },
   {
     title: '利星行汽车',
     src: './assets/donghua/6利星行汽车.mp4',
+    poster: './assets/donghua/posters/06.webp',
   },
   {
     title: '英菲尼迪',
     src: './assets/donghua/7英菲尼迪.mp4',
+    poster: './assets/donghua/posters/07.webp',
   },
 ];
 
@@ -153,6 +160,32 @@ function unloadDeferredVideoSource(video) {
   video.load();
 }
 
+function setupDeferredImages() {
+  const images = [...document.querySelectorAll('img[data-src]')];
+  if (!images.length) return;
+
+  const loadImage = (image) => {
+    if (!image.dataset.src) return;
+    image.src = image.dataset.src;
+    image.removeAttribute('data-src');
+  };
+
+  if (!('IntersectionObserver' in window)) {
+    images.forEach(loadImage);
+    return;
+  }
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (!entry.isIntersecting) return;
+      loadImage(entry.target);
+      observer.unobserve(entry.target);
+    });
+  }, { rootMargin: '320px 0px' });
+
+  images.forEach((image) => observer.observe(image));
+}
+
 function createMotionVideo(project, className) {
   const video = document.createElement('video');
   video.className = className;
@@ -224,15 +257,19 @@ function createMotionShowcase() {
 
   motionProjects.forEach((project, projectIndex) => {
     const previewButton = document.createElement('button');
-    const previewVideo = createMotionVideo(project, 'motion-showcase__preview-video');
+    const previewImage = document.createElement('img');
 
     previewButton.className = 'motion-showcase__preview';
     previewButton.type = 'button';
     previewButton.setAttribute('aria-pressed', String(projectIndex === mainProjectIndex));
     previewButton.setAttribute('aria-label', `在主画面播放：${project.title}`);
-    previewVideo.setAttribute('aria-hidden', 'true');
-    previewVideo.tabIndex = -1;
-    previewButton.append(previewVideo);
+    previewImage.className = 'motion-showcase__preview-video';
+    previewImage.src = project.poster;
+    previewImage.alt = '';
+    previewImage.loading = 'lazy';
+    previewImage.decoding = 'async';
+    previewImage.setAttribute('aria-hidden', 'true');
+    previewButton.append(previewImage);
 
     previewButton.addEventListener('click', () => {
       if (projectIndex === mainProjectIndex) return;
@@ -300,13 +337,13 @@ function renderDeck() {
     figure.className = `case-page__frame${isLongPage ? ' case-page__frame--long' : ''}`;
     figure.dataset.pageLabel = `PAGE ${pageLabel}`;
 
-    image.src = `./assets/case-pages/page-${pageLabel}.webp`;
+    image.dataset.pageSrc = `./assets/case-pages/page-${pageLabel}.webp`;
     image.alt = `李添添作品集，第 ${pageNumber} 页：${subject}`;
     image.width = 1280;
     image.height = isLongPage ? 6160 : 800;
     image.decoding = 'async';
-    image.loading = pageNumber <= 2 ? 'eager' : 'lazy';
-    if (pageNumber === 1) image.fetchPriority = 'high';
+    image.loading = 'lazy';
+    image.fetchPriority = 'low';
 
     caption.className = 'visually-hidden';
     caption.textContent = `${chapter.number} ${chapter.title}。${subject}。`;
@@ -379,6 +416,10 @@ function preloadNearbyPageImages(pageNumber) {
 
     image.loading = 'eager';
     image.fetchPriority = nearbyPage === pageNumber ? 'high' : 'auto';
+    if (!image.getAttribute('src') && image.dataset.pageSrc) {
+      image.src = image.dataset.pageSrc;
+      delete image.dataset.pageSrc;
+    }
     image.decode?.().catch(() => {});
   }
 }
@@ -626,7 +667,9 @@ let activePage = 1;
 function updateActivePage(pageNumber, updateHash = true) {
   if (pageNumber < 1 || pageNumber > TOTAL_PAGES) return;
   activePage = pageNumber;
-  preloadNearbyPageImages(pageNumber);
+  if (isCaseDeckActive() || shouldRestoreInitialPage) {
+    preloadNearbyPageImages(pageNumber);
+  }
   const chapter = chapterForPage(pageNumber);
   const chapterPageCount = chapter.end - chapter.start + 1;
   const chapterPagePosition = pageNumber - chapter.start + 1;
@@ -1033,6 +1076,7 @@ function bindInteractions() {
   });
 }
 
+setupDeferredImages();
 renderDeck();
 renderNavigation();
 refreshSnapScrollPositions();
